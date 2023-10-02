@@ -1,0 +1,336 @@
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <SoftwareSerial.h>
+#include <NewPing.h>
+#define SensorPin A2 //pH meter Analog output to Arduino Analog Input 0
+#define Offset 0.9 //deviation compensate
+unsigned long int avgValue; //Store the average value of the sensor feedback
+#define TRIGGER_PIN 23 // Arduino pin tied to trigger pin on ping sensor.
+#define ECHO_PIN 22 // Arduino pin tied to echo pin on ping sensor.
+#define MAX_DISTANCE 200 // Maximum distance we want to ping for (in 
+centimeters). Maximum sensor distance is rated at 400-500cm.
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE); // NewPing setup of 
+pins and maximum distance.
+unsigned int pingSpeed = 50; // How frequently are we going to send out a ping (in 
+milliseconds). 50ms would be 20 times a second.
+unsigned long pingTimer; // Holds the next ping time.
+// Data wire is plugged into pin 2 on the Arduino
+#define ONE_WIRE_BUS 6
+SoftwareSerial mySerial(7, 8);
+// Setup a oneWire instance to communicate with any OneWire devices (not just 
+Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+// Pass our oneWire reference to Dallas Temperature.
+DallasTemperature sensors(&oneWire);
+void setup(void)
+{
+// start serial port
+Serial.begin(9600);
+pingTimer = millis(); // Start now.
+// Start up the library
+sensors.begin(); // IC Default 9 bit. If you have troubles consider upping it 12. Ups the 
+delay giving the IC more time to process the temperature measurement
+lcd.begin(16, 2); //initilise lcd with num of coloums 16 ,by row 2.
+lcd.clear(); //clears lcd just in case there is anyting been displayed
+pinMode(blueled, OUTPUT);
+pinMode(redled, OUTPUT);
+pinMode(greenled, OUTPUT);
+pinMode(tempblueled, OUTPUT);
+pinMode(tempredled, OUTPUT);
+pinMode(tempgreenled, OUTPUT);
+pinMode(levblueled, OUTPUT);
+pinMode(levredled, OUTPUT);
+pinMode(levgreenled, OUTPUT);
+pinMode(turbblueled, OUTPUT);
+pinMode(turbredled, OUTPUT);
+pinMode(turbgreenled, OUTPUT);
+pinMode(buzzer, OUTPUT);
+digitalWrite(buzzer, LOW);
+//initialization();
+}
+void loop() {
+sensors.requestTemperatures(); // Send the command to get temperature
+Serial.println(sensors.getTempCByIndex(0));
+int reading = analogRead(sensorPin); 
+// converting that reading to voltage,
+float voltage = reading * 5.0;
+voltage /= 1024.0;
+// now print out the temperature
+float temperatureC = (voltage - 0.5) * 100 ;
+PH();
+digitalWrite(blueled, LOW);
+digitalWrite(redled, LOW);
+digitalWrite(greenled, LOW);
+temperature ();
+digitalWrite(tempblueled, LOW);
+digitalWrite(tempredled, LOW);
+digitalWrite(tempgreenled, LOW);
+turbidity();
+digitalWrite(turbblueled, LOW);
+digitalWrite(turbredled, LOW);
+digitalWrite(turbgreenled, LOW);
+digitalWrite(greenled, LOW);
+digitalWrite(tempgreenled, LOW);
+digitalWrite(levgreenled, LOW);
+digitalWrite(turbgreenled, LOW);
+delay(8000);
+}
+/////////////////////////////////////////////// FUNCTIONS//////////////////////////////////////////////////////
+void PH(){
+Serial.println(" ");
+lcd.clear( );
+digitalWrite(blueled, LOW);
+digitalWrite(greenled, LOW);
+digitalWrite(redled, LOW);
+digitalWrite(buzzer, LOW);
+lcd.setCursor(0,0);//set cursor (Colum by row) indexing from 0
+lcd.print("TAKING READINGS");
+lcd.setCursor(1,1);
+lcd.print("FROM PH SENSOR");
+Serial.println("Taking Readings from PH Sensor");
+// PHblink();
+int buf[10]; //buffer for read analog
+for(int i=0;i<10;i++) //Get 10 sample value from the sensor for smooth the value
+{
+buf[i]=analogRead(SensorPin);
+delay(10);
+}
+for(int i=0;i<9;i++) //sort the analog from small to large
+{
+for(int j=i+1;j<10;j++)
+{
+if(buf[i]>buf[j])
+{
+int temp=buf[i];
+buf[i]=buf[j];
+buf[j]=temp;
+}
+}
+}
+avgValue=0;
+for(int i=2;i<8;i++) //take the average value of 6 centre sample
+avgValue+=buf[i];
+float phValue=(float)avgValue*5.0/1024/6; //convert the analog into millivolt
+phValue=5.2*phValue+Offset; //convert the millivolt into pH value
+Serial.print("pH:");
+Serial.print(phValue,2);
+Serial.println(" ");
+if(phValue >= 7.20){
+lcd.clear();
+digitalWrite(blueled, LOW);
+digitalWrite(greenled, LOW);
+digitalWrite(redled, HIGH);
+digitalWrite(buzzer, HIGH);
+lcd.setCursor(1,0);//set cursor (Colum by row) indexing from 0
+lcd.print("PH VALUE:");
+lcd.setCursor(10,0);
+lcd.print(phValue);
+lcd.setCursor(0,1);
+Serial.print("PH VALUE: ");
+Serial.println(phValue);
+lcd.setCursor(0,1);//set cursor (Colum by row) indexing from 0
+lcd.print("ALKALINITY HIGH");
+Serial.println("Water Alkalinity high");
+delay(3000);
+}
+if(phValue >= 6.90 && phValue <= 7.19){
+digitalWrite(blueled, HIGH);
+digitalWrite(greenled,LOW);
+digitalWrite(redled, LOW);
+digitalWrite(buzzer, LOW);
+lcd.clear();
+lcd.setCursor(1,0);//set cursor (colum by row) indexing from 0
+lcd.print("PH VALUE:");
+lcd.setCursor(10,0);
+lcd.print(phValue);
+lcd.setCursor(0,1);
+Serial.print("PH VALUE: ");
+Serial.println(phValue);
+lcd.setCursor(1,1);//set cursor (colum by row) indexing from 0
+lcd.print("WATER IS SAFE");
+Serial.println("Water Is neutral (safe)");
+}
+if(phValue < 6.89){
+lcd.clear();
+digitalWrite(blueled, LOW);
+digitalWrite(greenled, LOW);
+digitalWrite(redled, HIGH);
+digitalWrite(buzzer, HIGH);
+lcd.setCursor(1,0);//set cursor (colum by row) indexing from 0
+lcd.print("PH VALUE:");
+lcd.setCursor(10,0);
+lcd.print(phValue);
+lcd.setCursor(0,1);
+Serial.print("PH VALUE: ");
+Serial.println(phValue);
+lcd.setCursor(2,1);//set cursor (colum by row) indexing from 0
+lcd.print("ACIDITY HIGH");
+Serial.println("Water Acidity High");
+delay(3000);
+}
+delay(8000);
+}
+void temperature (){
+Serial.println(" ");
+lcd.clear( );
+lcd.setCursor(0,0);//set cursor (colum by row) indexing from 0
+lcd.print("TAKING READINGS");
+lcd.setCursor(0,1);
+lcd.print("FROM TEMP SENSOR");
+Serial.println("Taking Readings from Temperature Sensor");
+// TEMPblink();
+// temp_check_surr();
+delay(4000);
+temp_check_water();
+}
+void temp_check_water(){
+lcd.clear();
+digitalWrite(tempblueled, LOW);
+digitalWrite(tempgreenled, LOW);
+digitalWrite(tempredled, LOW);
+digitalWrite(buzzer, LOW);
+sensors.requestTemperatures(); // Send the command to get temperature
+Serial.print("Water Temperature: ");
+Serial.println(sensors.getTempCByIndex(0));
+if(sensors.getTempCByIndex(0) > 40){
+digitalWrite(tempblueled, LOW);
+digitalWrite(tempgreenled, LOW);
+digitalWrite(tempredled, HIGH);
+digitalWrite(buzzer, HIGH);
+lcd.setCursor(0,0);//set cursor (colum by row) indexing from 0
+lcd.print("WAT TEMP:");
+lcd.setCursor(9,0);
+lcd.print(sensors.getTempCByIndex(0));
+lcd.setCursor(14,0);
+lcd.print("*C");
+lcd.setCursor(0,1);
+Serial.print("Water Temperature: ");
+Serial.print(sensors.getTempCByIndex(0));
+Serial.println(" degree C");
+lcd.setCursor(0,1);//set cursor (colum by row) indexing from 0
+lcd.print("WATER TEMP HIGH");
+Serial.println("Water Temperature high");
+delay(3000);
+}
+if(sensors.getTempCByIndex(0) >= 15 && sensors.getTempCByIndex(0) <= 40){
+digitalWrite(tempblueled, HIGH);
+digitalWrite(tempgreenled,LOW);
+digitalWrite(tempredled, LOW);
+digitalWrite(buzzer, LOW);
+lcd.setCursor(0,0);//set cursor (colum by row) indexing from 0
+lcd.print("WAT TEMP:");
+lcd.setCursor(9,0);
+lcd.print(sensors.getTempCByIndex(0));
+lcd.setCursor(14,0);
+lcd.print("*C");
+lcd.setCursor(0,1);
+Serial.print("Water Temperature: ");
+Serial.print(sensors.getTempCByIndex(0));
+Serial.println(" degree C");
+lcd.setCursor(0,1);//set cursor (colum by row) indexing from 0
+lcd.print("WATER TEMP NORMAL");
+Serial.println("Water Temperature normal");
+}
+if(sensors.getTempCByIndex(0) < 15){
+digitalWrite(tempblueled, LOW);
+digitalWrite(tempgreenled, LOW);
+digitalWrite(tempredled, HIGH);
+digitalWrite(buzzer, HIGH);
+lcd.setCursor(0,0);//set cursor (colum by row) indexing from 0
+lcd.print("WAT TEMP:");
+lcd.setCursor(9,0);
+lcd.print(sensors.getTempCByIndex(0));
+lcd.setCursor(14,0);
+lcd.print("*C");
+lcd.setCursor(0,1);
+Serial.print("Water Temperature: ");
+Serial.print(sensors.getTempCByIndex(0));
+Serial.println(" degree C");
+lcd.setCursor(0,1);//set cursor (colum by row) indexing from 0
+lcd.print("WATER TEMP LOW");
+Serial.println("Water Temperature low");
+delay(3000);
+}
+delay(8000);
+}
+void turbidity() {
+Serial.println(" ");
+digitalWrite(turbblueled, LOW);
+digitalWrite(turbgreenled, LOW);
+digitalWrite(turbredled, LOW);
+digitalWrite(buzzer, LOW);
+lcd.clear( );
+lcd.setCursor(1,0);//set cursor (colum by row) indexing from 0
+lcd.print("READINGS FROM");
+lcd.setCursor(0,1);
+lcd.print("TURBIDITY SENSOR");
+Serial.println("Taking Readings from turbidity Sensor");
+// TURBblink();
+int turbidityValue = analogRead(A1);
+float turbidityV = turbidityValue/100;
+Serial.print("Turbidity level: ");
+Serial.println(turbidityV);
+if( turbidityV > 9){
+digitalWrite(turbblueled, LOW);
+digitalWrite(turbgreenled, LOW);
+digitalWrite(turbredled, HIGH);
+digitalWrite(buzzer, HIGH);
+lcd.clear( );
+lcd.setCursor(0,0);//set cursor (colum by row) indexing from 0
+lcd.print("TURBI LEV:");
+lcd.setCursor(11,0);
+lcd.print(turbidityV);
+lcd.setCursor(14,0);
+lcd.print("NTU");
+lcd.setCursor(0,1);
+Serial.print("Turbidity Level: ");
+Serial.print(turbidityV);
+Serial.println("NTU");
+lcd.setCursor(0,1);//set cursor (colum by row) indexing from 0
+lcd.print("WATER VERY CLEAN");
+Serial.println("Water Very Clean ");
+delay(3000);
+}
+if( turbidityV >= 6 && turbidityValue/100 <= 9 ){
+digitalWrite(turbblueled, HIGH);
+digitalWrite(turbgreenled, LOW);
+digitalWrite(turbredled, LOW);
+digitalWrite(buzzer, LOW);
+lcd.clear( );
+lcd.setCursor(0,0);//set cursor (colum by row) indexing from 0
+lcd.print("TURBI LEV:");
+lcd.setCursor(10,0);
+lcd.print(turbidityV);
+lcd.setCursor(13,0);
+lcd.print("NTU");
+lcd.setCursor(0,1);
+Serial.print("Turbidity Level: ");
+Serial.print(turbidityV);
+Serial.println("NTU");
+lcd.setCursor(0,1);//set cursor (colum by row) indexing from 0
+lcd.print("WATER NORM CLEAN");
+Serial.println("Water Clean ");
+}
+if( turbidityV < 6){
+digitalWrite(turbblueled, LOW);
+digitalWrite(turbgreenled, LOW);
+digitalWrite(turbredled, HIGH);
+digitalWrite(buzzer, HIGH);
+lcd.clear( );
+lcd.setCursor(0,0);//set cursor (colum by row) indexing from 0
+lcd.print("TURBI LEV:");
+lcd.setCursor(11,0);
+lcd.print(turbidityV);
+lcd.setCursor(14,0);
+lcd.print("NTU");
+lcd.setCursor(0,1);
+Serial.print("Turbidity Level: ");
+Serial.print(turbidityV);
+Serial.println("NTU");
+lcd.setCursor(0,1);//set cursor (colum by row) indexing from 0
+lcd.print("WATER VERY DIRTY");
+Serial.println("Water Very Dirty ");
+delay(3000);
+}
+delay (8000);
+}
